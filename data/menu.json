@@ -1,0 +1,49 @@
+{
+  "categories": [
+    {
+      "id": "empanadas",
+      "label": "Empanadas",
+      "items": [
+        {"id": "emp_carne_suave", "name": "Carne suave", "description": "Carne cortada a cuchillo con cebolla y huevo.", "price": 800, "stock": 24, "image": "/images/placeholder.svg"},
+        {"id": "emp_carne_picante", "name": "Carne picante", "description": "Carne con ají molido y pimentón ahumado.", "price": 820, "stock": 20, "image": "/images/placeholder.svg"},
+        {"id": "emp_pollo", "name": "Pollo", "description": "Pollo desmechado con salsa criolla.", "price": 780, "stock": 18, "image": "/images/placeholder.svg"},
+        {"id": "emp_jyq", "name": "Jamón y queso", "description": "Clásica de jamón cocido y queso cremoso.", "price": 760, "stock": 30, "image": "/images/placeholder.svg"},
+        {"id": "emp_caprese", "name": "Caprese", "description": "Tomate, albahaca fresca y mozzarella.", "price": 790, "stock": 16, "image": "/images/placeholder.svg"},
+        {"id": "emp_humita", "name": "Humita", "description": "Choclo cremoso con queso y un toque de pimentón.", "price": 780, "stock": 14, "image": "/images/placeholder.svg"}
+      ]
+    },
+    {
+      "id": "pizzas",
+      "label": "Pizzas",
+      "items": [
+        {"id": "pizza_muzza", "name": "Muzzarella", "description": "Salsa de tomate, muzza y aceitunas.", "price": 5800, "stock": 10, "image": "/images/placeholder.svg"},
+        {"id": "pizza_napolitana", "name": "Napolitana", "description": "Muzza, tomate en rodajas, ajo y orégano.", "price": 6200, "stock": 10, "image": "/images/placeholder.svg"},
+        {"id": "pizza_fugazzeta", "name": "Fugazzeta", "description": "Cebolla caramelizada y muzza abundante.", "price": 6400, "stock": 8, "image": "/images/placeholder.svg"},
+        {"id": "pizza_calabresa", "name": "Calabresa", "description": "Longaniza parrillera y morrones asados.", "price": 6800, "stock": 8, "image": "/images/placeholder.svg"},
+        {"id": "pizza_provolone", "name": "Provolone", "description": "Provolone, muzza y orégano fresco.", "price": 6600, "stock": 6, "image": "/images/placeholder.svg"},
+        {"id": "pizza_rucula_crudo", "name": "Rúcula y crudo", "description": "Muzza, rúcula fresca y jamón crudo.", "price": 7200, "stock": 5, "image": "/images/placeholder.svg"},
+        {"id": "pizza_4quesos", "name": "Cuatro quesos", "description": "Muzza, parmesano, roquefort y provolone.", "price": 7100, "stock": 7, "image": "/images/placeholder.svg"},
+        {"id": "pizza_vegana", "name": "Vegana", "description": "Base de tomate, vegetales grillados y queso vegano.", "price": 7000, "stock": 4, "image": "/images/placeholder.svg"}
+      ]
+    },
+    {
+      "id": "hamburguesas",
+      "label": "Hamburguesas",
+      "items": [
+        {"id": "burg_clasica", "name": "Clásica", "description": "Doble carne, cheddar y aderezo de la casa.", "price": 4800, "stock": 12, "image": "/images/placeholder.svg"},
+        {"id": "burg_criolla", "name": "Criolla", "description": "Carne, provoleta, chimichurri y criolla.", "price": 5200, "stock": 10, "image": "/images/placeholder.svg"},
+        {"id": "burg_bacon", "name": "Bacon y cheddar", "description": "Tiras crocantes de panceta y cheddar.", "price": 5300, "stock": 9, "image": "/images/placeholder.svg"},
+        {"id": "burg_vegana", "name": "Vegana de lentejas", "description": "Medallón de lentejas, hummus y vegetales grillados.", "price": 5000, "stock": 6, "image": "/images/placeholder.svg"}
+      ]
+    },
+    {
+      "id": "lomitos",
+      "label": "Lomitos",
+      "items": [
+        {"id": "lomito_clasico", "name": "Clásico", "description": "Lomo, lechuga, tomate, huevo y aderezo de la casa.", "price": 5400, "stock": 10, "image": "/images/placeholder.svg"},
+        {"id": "lomito_completo", "name": "Completo", "description": "Lomo, jamón, queso, panceta y huevo.", "price": 5800, "stock": 8, "image": "/images/placeholder.svg"},
+        {"id": "lomito_vegetariano", "name": "Vegetariano", "description": "Berenjenas grilladas, provoleta y pesto criollo.", "price": 5200, "stock": 7, "image": "/images/placeholder.svg"}
+      ]
+    }
+  ]
+}

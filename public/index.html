@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pizzería Criolla - Pedidos</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Pizzería Criolla</h1>
+      <p>Hacé tu pedido de pizzas, empanadas, hamburguesas y lomitos en minutos.</p>
+    </header>
+
+    <main>
+      <section class="section" id="menu-section">
+        <h2>Menú disponible</h2>
+        <div id="menu-container"></div>
+      </section>
+
+      <section class="section" id="buyer-section">
+        <h2>Datos de entrega</h2>
+        <div class="form-grid">
+          <div>
+            <label for="customer-name">Nombre y apellido</label>
+            <input id="customer-name" type="text" placeholder="Ej: Ana Gómez" />
+          </div>
+          <div>
+            <label for="customer-phone">Teléfono</label>
+            <input id="customer-phone" type="tel" placeholder="Ej: 11 3627-5604" />
+          </div>
+          <div>
+            <label for="customer-address">Dirección</label>
+            <input id="customer-address" type="text" placeholder="Calle, número, barrio" />
+          </div>
+          <div>
+            <label for="payment-method">Forma de pago</label>
+            <select id="payment-method">
+              <option value="">Seleccioná una opción</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="efectivo">Efectivo al entregar</option>
+            </select>
+            <small id="payment-note"></small>
+          </div>
+        </div>
+        <div id="transfer-details" class="summary" style="display: none; margin-top: 12px;">
+          <h3>Datos para transferencia</h3>
+          <p><strong>Alias:</strong> pizzacriolla.mp</p>
+          <p><strong>CBU:</strong> 0000003100062713568901</p>
+          <p>Por favor, adjuntá la captura de la transferencia en el mensaje de WhatsApp.</p>
+        </div>
+      </section>
+
+      <section class="section" id="actions-section">
+        <h2>Checkout</h2>
+        <p>Revisá tu pedido antes de enviarlo. Si necesitás cambiar algo, usá el botón "Seguir comprando".</p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button class="primary" id="review-btn">Revisar pedido</button>
+          <button class="secondary" id="clear-btn">Seguir comprando</button>
+        </div>
+        <div id="summary" class="summary" style="display: none; margin-top: 12px;"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p>Pedidos argentinos con envío por WhatsApp. Número directo: +54 9 11 3627-5604</p>
+    </footer>
+
+    <script src="/main.js"></script>
+  </body>
+</html>
