@@ -4,6 +4,7 @@ import Dashboard from '../pages/Dashboard'
 import Productos from '../pages/Productos'
 import Movimientos from '../pages/Movimientos'
 import Kardex from '../pages/Kardex'
+import Almacenes from '../pages/Almacenes'
 
 function AppRouter() {
   return (
@@ -13,6 +14,7 @@ function AppRouter() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/productos" element={<Productos />} />
         <Route path="/movimientos" element={<Movimientos />} />
+        <Route path="/almacenes" element={<Almacenes />} />
         <Route path="/kardex" element={<Kardex />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

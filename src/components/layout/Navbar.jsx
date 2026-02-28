@@ -9,13 +9,13 @@ const links = [
 
 function Navbar() {
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav className="navbar navbar-expand-lg navbar-dark glass-nav sticky-top">
       <div className="container">
-        <NavLink className="navbar-brand fw-semibold" to="/dashboard">
+        <NavLink className="navbar-brand fw-bold fs-4 text-gradient" to="/dashboard">
           Stock Pro
         </NavLink>
         <button
-          className="navbar-toggler"
+          className="navbar-toggler border-0 shadow-none"
           type="button"
           data-bs-toggle="collapse"
           data-bs-target="#navMain"
@@ -27,13 +27,13 @@ function Navbar() {
         </button>
 
         <div className="collapse navbar-collapse" id="navMain">
-          <div className="navbar-nav ms-auto">
+          <div className="navbar-nav ms-auto gap-2">
             {links.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
                 className={({ isActive }) =>
-                  `nav-link ${isActive ? 'active fw-semibold text-white' : ''}`
+                  `nav-link ${isActive ? 'active shadow-sm' : 'text-white-50'}`
                 }
               >
                 {link.label}
