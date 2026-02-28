@@ -1,14 +1,23 @@
 {
-  "name": "pizzeria",
-  "version": "1.0.0",
-  "description": "Web app de pedidos para pizzas, empanadas, hamburguesas y lomitos con checkout por WhatsApp.",
-  "main": "server.js",
+  "name": "stock-pro2-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"No hay tests configurados\""
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
-  "keywords": ["pizzeria", "delivery", "whatsapp"],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "dependencies": {
+    "bootstrap": "^5.3.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.19"
+  }
 }
