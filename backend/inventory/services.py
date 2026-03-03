@@ -42,6 +42,12 @@ def calculate_stock(product, deposit=None):
     return total or Decimal("0")
 
 
+def calculate_available_stock(product):
+    physical_stock = calculate_stock(product)
+    reserved = product.reserved_stock or Decimal("0")
+    return physical_stock - reserved
+
+
 @transaction.atomic
 def register_movement(user, data):
     product = data["product"]

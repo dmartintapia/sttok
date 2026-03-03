@@ -13,6 +13,7 @@ from .views import (
     AuditLogViewSet,
     StockAlertsView,
     StockSummaryView,
+    ActiveReservationsView,
 )
 
 router = DefaultRouter()
@@ -30,4 +31,5 @@ urlpatterns = [
     path("", include(router.urls)),
     path("dashboard/alerts/", StockAlertsView.as_view(), name="stock-alerts"),
     path("dashboard/summary/", StockSummaryView.as_view(), name="stock-summary"),
+    path("dashboard/reservations/", ActiveReservationsView.as_view(), name="active-reservations"),
 ]

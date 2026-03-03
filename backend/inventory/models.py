@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.contrib.postgres.indexes import GinIndex
 
 
 class TimestampedModel(models.Model):
@@ -40,6 +41,14 @@ class Product(TimestampedModel):
     unit = models.ForeignKey(Unit, on_delete=models.PROTECT)
     stock_minimum = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     average_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sale_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    reserved_stock = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=["sku"], name="inv_prod_sku_trgm", opclasses=["gin_trgm_ops"]),
+            GinIndex(fields=["name"], name="inv_prod_name_trgm", opclasses=["gin_trgm_ops"]),
+        ]
 
     def __str__(self):
         return f"{self.sku} - {self.name}"
@@ -85,6 +94,12 @@ class Movement(TimestampedModel):
     cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["-created_at"], name="inv_mov_created_idx"),
+            models.Index(fields=["product", "-created_at"], name="inv_mov_prod_date_idx"),
+        ]
 
     def __str__(self):
         return f"{self.product} - {self.movement_type} - {self.quantity}"

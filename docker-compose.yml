@@ -16,6 +16,12 @@ services:
     build: ./backend
     env_file:
       - .env.example
+    environment:
+      POSTGRES_DB: stock_manager
+      POSTGRES_USER: stock
+      POSTGRES_PASSWORD: stock
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
     volumes:
       - ./backend:/app
     ports:

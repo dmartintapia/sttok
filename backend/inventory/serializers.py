@@ -1,4 +1,5 @@
 from decimal import Decimal
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.db import transaction
 
@@ -13,7 +14,24 @@ from .models import (
     PriceList,
     AuditLog,
 )
-from .services import register_movement, calculate_stock
+from .services import register_movement, calculate_stock, calculate_available_stock
+
+
+def get_or_create_system_user():
+    User = get_user_model()
+    user, _ = User.objects.get_or_create(
+        username="system_api",
+        defaults={
+            "email": "system-api@local",
+            "is_staff": True,
+            "is_active": True,
+        },
+    )
+    if not user.has_usable_password():
+        return user
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
+    return user
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -36,6 +54,9 @@ class DepositSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     current_stock = serializers.SerializerMethodField()
+    available_stock = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    last_movement_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Product
@@ -44,16 +65,63 @@ class ProductSerializer(serializers.ModelSerializer):
             "sku",
             "name",
             "category",
+            "category_name",
             "unit",
             "stock_minimum",
             "average_cost",
+            "sale_price",
+            "reserved_stock",
             "current_stock",
+            "available_stock",
+            "last_movement_at",
             "created_at",
             "updated_at",
         ]
 
     def get_current_stock(self, obj):
         return calculate_stock(obj)
+
+    def get_available_stock(self, obj):
+        return calculate_available_stock(obj)
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        old_sale_price = instance.sale_price
+        old_stock_minimum = instance.stock_minimum
+
+        product = super().update(instance, validated_data)
+
+        changed_fields = {}
+        if "sale_price" in validated_data and product.sale_price != old_sale_price:
+            changed_fields["sale_price"] = {
+                "before": str(old_sale_price),
+                "after": str(product.sale_price),
+            }
+        if "stock_minimum" in validated_data and product.stock_minimum != old_stock_minimum:
+            changed_fields["stock_minimum"] = {
+                "before": str(old_stock_minimum),
+                "after": str(product.stock_minimum),
+            }
+
+        if changed_fields:
+            request = self.context.get("request")
+            request_user = getattr(request, "user", None)
+            user = (
+                request_user
+                if request_user and request_user.is_authenticated
+                else get_or_create_system_user()
+            )
+            AuditLog.objects.create(
+                action="Actualizacion de parametros de producto",
+                user=user,
+                metadata={
+                    "product_id": product.id,
+                    "sku": product.sku,
+                    "changes": changed_fields,
+                },
+            )
+
+        return product
 
 
 class ClientSerializer(serializers.ModelSerializer):
@@ -97,7 +165,12 @@ class MovementSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        user = self.context["request"].user
+        request_user = self.context["request"].user
+        user = (
+            request_user
+            if request_user and request_user.is_authenticated
+            else get_or_create_system_user()
+        )
         return register_movement(user, validated_data)
 
 
