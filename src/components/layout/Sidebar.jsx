@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Package, BarChart2, ChevronLeft, Search, Map } from 'lucide-react'
+import { Home, Package, BarChart2, ChevronLeft, Search, Map, Users } from 'lucide-react'
 import { clearAuthSession } from '../../services/dataService'
 
 function Sidebar() {
@@ -30,6 +30,9 @@ function Sidebar() {
                 </NavLink>
                 <NavLink to="/almacenes" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
                     <Map size={18} /> Almacenes
+                </NavLink>
+                <NavLink to="/usuarios" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+                    <Users size={18} /> Usuarios
                 </NavLink>
 
                 <div className="nav-group-title">Reportes</div>

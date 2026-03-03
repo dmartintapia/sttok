@@ -110,6 +110,29 @@ export async function getCurrentSessionProfile() {
   return merged
 }
 
+export async function getCompanyUsers() {
+  const rows = unwrapList(await apiFetch('/auth/users/'))
+  return rows.map((row) => ({
+    id: Number(row.id),
+    username: row.username,
+    role: row.role,
+    companyCode: row.company_code,
+  }))
+}
+
+export async function createCompanyUser({ username, password, role }) {
+  const created = await apiFetch('/auth/users/', {
+    method: 'POST',
+    body: { username, password, role },
+  })
+  return {
+    id: Number(created.id),
+    username: created.username,
+    role: created.role,
+    companyCode: created.company_code,
+  }
+}
+
 async function getCategoriesMap() {
   const categories = unwrapList(await apiFetch('/categories/'))
   return Object.fromEntries(categories.map((c) => [c.id, c.name]))

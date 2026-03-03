@@ -7,6 +7,7 @@ import Movimientos from '../pages/Movimientos'
 import Kardex from '../pages/Kardex'
 import Almacenes from '../pages/Almacenes'
 import Login from '../pages/Login'
+import Usuarios from '../pages/Usuarios'
 import { hasAuthSession } from '../services/dataService'
 
 function AppRouter() {
@@ -40,6 +41,7 @@ function AppRouter() {
         <Route path="/productos" element={<Productos />} />
         <Route path="/movimientos" element={<Movimientos />} />
         <Route path="/almacenes" element={<Almacenes />} />
+        <Route path="/usuarios" element={<Usuarios />} />
         <Route path="/kardex" element={<Kardex />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
