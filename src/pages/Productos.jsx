@@ -548,6 +548,7 @@ function Productos() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [skuError, setSkuError] = useState('')
   const [categoryError, setCategoryError] = useState('')
+  const [reloadTick, setReloadTick] = useState(0)
   const [productFilters, setProductFilters] = useState({ q: '', categoria: '' })
   const [pagination, setPagination] = useState({
     page: 1,
@@ -596,7 +597,7 @@ function Productos() {
     return () => {
       cancelled = true
     }
-  }, [pagination.page, pagination.pageSize, productFilters.q, productFilters.categoria])
+  }, [pagination.page, pagination.pageSize, productFilters.q, productFilters.categoria, reloadTick])
 
   const onChange = (event) => {
     const { name, value } = event.target
@@ -648,6 +649,7 @@ function Productos() {
 
       const nuevo = await createProducto({ ...form, categoria: categoriaSeleccionada })
       setPagination((prev) => ({ ...prev, page: 1 }))
+      setReloadTick((prev) => prev + 1)
       setForm({ ...initialForm, categoria: categoriaSeleccionada || categorias[0] || '' })
       setSelectedProduct(nuevo)
     } catch (err) {
