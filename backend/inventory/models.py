@@ -31,33 +31,48 @@ class UserCompany(TimestampedModel):
 
 
 class Category(TimestampedModel):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company", "name"], name="uq_category_company_name"),
+        ]
 
     def __str__(self):
         return self.name
 
 
 class Unit(TimestampedModel):
-    name = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50)
     symbol = models.CharField(max_length=10)
     company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company", "name"], name="uq_unit_company_name"),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.symbol})"
 
 
 class Deposit(TimestampedModel):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     location = models.CharField(max_length=150, blank=True)
     company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company", "name"], name="uq_deposit_company_name"),
+        ]
 
     def __str__(self):
         return self.name
 
 
 class Product(TimestampedModel):
-    sku = models.CharField(max_length=50, unique=True)
+    sku = models.CharField(max_length=50)
     name = models.CharField(max_length=200)
     company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT)
@@ -71,6 +86,9 @@ class Product(TimestampedModel):
         indexes = [
             GinIndex(fields=["sku"], name="inv_prod_sku_trgm", opclasses=["gin_trgm_ops"]),
             GinIndex(fields=["name"], name="inv_prod_name_trgm", opclasses=["gin_trgm_ops"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["company", "sku"], name="uq_product_company_sku"),
         ]
 
     def __str__(self):

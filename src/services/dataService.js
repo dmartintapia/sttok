@@ -63,6 +63,7 @@ async function apiFetch(path, options = {}) {
   if (!response.ok) {
     if (response.status === 401 && session?.access) {
       clearAuthSession()
+      window.dispatchEvent(new CustomEvent('auth:expired'))
       throw new Error('Sesion expirada. Inicia sesion nuevamente.')
     }
     const detail = extractApiErrorMessage(data) || 'Error de API'
@@ -87,6 +88,7 @@ export function hasAuthSession() {
 
 export function clearAuthSession() {
   localStorage.removeItem(AUTH_STORAGE_KEY)
+  window.dispatchEvent(new CustomEvent('auth:changed'))
 }
 
 export async function login({ company, username, password }) {
@@ -96,6 +98,7 @@ export async function login({ company, username, password }) {
     headers: {},
   })
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data))
+  window.dispatchEvent(new CustomEvent('auth:changed'))
   return data
 }
 

@@ -3,7 +3,6 @@
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
-from django.contrib.auth.hashers import make_password
 
 
 def seed_default_company(apps, schema_editor):
@@ -32,15 +31,6 @@ def seed_default_company(apps, schema_editor):
     for user in User.objects.all():
         UserCompany.objects.get_or_create(user=user, defaults={"company": company})
 
-    if not User.objects.filter(username="admin").exists():
-        admin = User.objects.create(
-            username="admin",
-            is_active=True,
-            is_staff=True,
-            is_superuser=True,
-            password=make_password("admin123"),
-        )
-        UserCompany.objects.get_or_create(user=admin, defaults={"company": company})
 
 
 class Migration(migrations.Migration):

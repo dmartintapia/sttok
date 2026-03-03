@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import MainLayout from '../components/layout/MainLayout'
 import Dashboard from '../pages/Dashboard'
@@ -11,6 +11,16 @@ import { hasAuthSession } from '../services/dataService'
 
 function AppRouter() {
   const [authenticated, setAuthenticated] = useState(hasAuthSession())
+
+  useEffect(() => {
+    const sync = () => setAuthenticated(hasAuthSession())
+    window.addEventListener('auth:changed', sync)
+    window.addEventListener('auth:expired', sync)
+    return () => {
+      window.removeEventListener('auth:changed', sync)
+      window.removeEventListener('auth:expired', sync)
+    }
+  }, [])
 
   if (!authenticated) {
     return (
