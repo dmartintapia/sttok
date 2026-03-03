@@ -15,6 +15,7 @@ from .models import (
     AuditLog,
 )
 from .services import register_movement, calculate_stock, calculate_available_stock
+from .tenancy import require_company
 
 
 def get_or_create_system_user():
@@ -62,6 +63,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             "id",
+            "company",
             "sku",
             "name",
             "category",
@@ -77,6 +79,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        read_only_fields = ["company"]
 
     def get_current_stock(self, obj):
         return calculate_stock(obj)
@@ -147,6 +150,7 @@ class MovementSerializer(serializers.ModelSerializer):
         model = Movement
         fields = [
             "id",
+            "company",
             "product",
             "deposit",
             "movement_type",
@@ -156,12 +160,24 @@ class MovementSerializer(serializers.ModelSerializer):
             "user",
             "created_at",
         ]
-        read_only_fields = ["user", "created_at"]
+        read_only_fields = ["user", "created_at", "company"]
 
     def validate_quantity(self, value):
         if value <= Decimal("0"):
             raise serializers.ValidationError("La cantidad debe ser mayor a cero.")
         return value
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        company = require_company(getattr(request, "user", None))
+        product = attrs.get("product")
+        deposit = attrs.get("deposit")
+
+        if product and product.company_id and product.company_id != company.id:
+            raise serializers.ValidationError("Producto fuera de la empresa del usuario.")
+        if deposit and deposit.company_id and deposit.company_id != company.id:
+            raise serializers.ValidationError("Almacen fuera de la empresa del usuario.")
+        return attrs
 
     @transaction.atomic
     def create(self, validated_data):
@@ -171,6 +187,7 @@ class MovementSerializer(serializers.ModelSerializer):
             if request_user and request_user.is_authenticated
             else get_or_create_system_user()
         )
+        validated_data["company"] = require_company(request_user)
         return register_movement(user, validated_data)
 
 

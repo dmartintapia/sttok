@@ -1,6 +1,7 @@
 import { alertasMock } from '../mock/data'
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/$/, '')
+const AUTH_STORAGE_KEY = 'sttok_auth_session'
 
 const unwrapList = (data) => {
   if (Array.isArray(data)) return data
@@ -44,10 +45,13 @@ const extractApiErrorMessage = (data) => {
 }
 
 async function apiFetch(path, options = {}) {
+  const session = getAuthSession()
+  const authHeaders = session?.access ? { Authorization: `Bearer ${session.access}` } : {}
   const response = await fetch(`${API_BASE}${path}`, {
     method: options.method || 'GET',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...(options.headers || {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
@@ -57,11 +61,50 @@ async function apiFetch(path, options = {}) {
   const data = contentType.includes('application/json') ? await response.json() : null
 
   if (!response.ok) {
+    if (response.status === 401 && session?.access) {
+      clearAuthSession()
+      throw new Error('Sesion expirada. Inicia sesion nuevamente.')
+    }
     const detail = extractApiErrorMessage(data) || 'Error de API'
     throw new Error(detail)
   }
 
   return data
+}
+
+export function getAuthSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export function hasAuthSession() {
+  return Boolean(getAuthSession()?.access)
+}
+
+export function clearAuthSession() {
+  localStorage.removeItem(AUTH_STORAGE_KEY)
+}
+
+export async function login({ company, username, password }) {
+  const data = await apiFetch('/auth/login/', {
+    method: 'POST',
+    body: { company, username, password },
+    headers: {},
+  })
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data))
+  return data
+}
+
+export async function getCurrentSessionProfile() {
+  const me = await apiFetch('/auth/me/')
+  const session = getAuthSession()
+  const merged = { ...(session || {}), ...me }
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(merged))
+  return merged
 }
 
 async function getCategoriesMap() {

@@ -1,7 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import { Home, Package, BarChart2, ChevronLeft, Search, Map } from 'lucide-react'
+import { clearAuthSession } from '../../services/dataService'
 
 function Sidebar() {
+    const onLogout = () => {
+        clearAuthSession()
+        window.location.href = '/login'
+    }
+
     return (
         <aside className="sidebar">
             <div className="sidebar-header">
@@ -35,6 +41,13 @@ function Sidebar() {
             <div className="p-3 mt-auto border-top border-secondary border-opacity-10 text-center">
                 <button className="btn btn-link text-white-50 text-decoration-none p-0 d-flex align-items-center justify-content-center gap-1 mx-auto" style={{ fontSize: '11px' }}>
                     <ChevronLeft size={12} /> Go back
+                </button>
+                <button
+                    className="btn btn-outline-light btn-sm mt-2"
+                    type="button"
+                    onClick={onLogout}
+                >
+                    Cerrar sesion
                 </button>
             </div>
         </aside>

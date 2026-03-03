@@ -4,7 +4,7 @@ from datetime import date
 from django.db.models import F, Case, When, Value, DecimalField, Sum, ExpressionWrapper, Q, Max
 from django.db import transaction
 from rest_framework import viewsets, status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.pagination import PageNumberPagination
@@ -36,10 +36,10 @@ from .serializers import (
     AuditLogSerializer,
     StockAlertSerializer,
     StockSummarySerializer,
-    get_or_create_system_user,
 )
 from .services import calculate_stock, POSITIVE_TYPES, NEGATIVE_TYPES
 from .services import register_movement, calculate_available_stock
+from .tenancy import require_company
 
 logger = logging.getLogger("inventory")
 
@@ -84,35 +84,58 @@ def _api_type_to_ui_type(movement_type, notes):
     return "salida"
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+class CompanyScopedModelViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def get_company(self):
+        return require_company(self.request.user)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(company=self.get_company())
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company())
+
+
+class CompanyScopedReadOnlyModelViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def get_company(self):
+        return require_company(self.request.user)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(company=self.get_company())
+
+
+class CategoryViewSet(CompanyScopedModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [AllowAny]
 
 
-class UnitViewSet(viewsets.ModelViewSet):
+class UnitViewSet(CompanyScopedModelViewSet):
     queryset = Unit.objects.all()
     serializer_class = UnitSerializer
-    permission_classes = [AllowAny]
 
 
-class DepositViewSet(viewsets.ModelViewSet):
+class DepositViewSet(CompanyScopedModelViewSet):
     queryset = Deposit.objects.all()
     serializer_class = DepositSerializer
-    permission_classes = [AllowAny]
 
 
-class ProductViewSet(viewsets.ModelViewSet):
+class ProductViewSet(CompanyScopedModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [AllowAny]
     filter_backends = [SearchFilter]
     search_fields = ["sku", "name"]
 
     @action(detail=False, methods=["get"], url_path="catalog")
     def catalog(self, request):
+        company = self.get_company()
         queryset = (
             Product.objects.select_related("category")
+            .filter(company=company)
             .annotate(last_movement_at=Max("movement__created_at"))
             .order_by("sku")
         )
@@ -132,6 +155,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="quick-search")
     def quick_search(self, request):
+        company = self.get_company()
         query = str(request.query_params.get("q", "")).strip()
         if len(query) < 2:
             return Response([], status=status.HTTP_200_OK)
@@ -143,7 +167,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         limit = max(1, min(limit, 100))
 
         queryset = (
-            Product.objects.filter(Q(sku__icontains=query) | Q(name__icontains=query))
+            Product.objects.filter(company=company).filter(
+                Q(sku__icontains=query) | Q(name__icontains=query)
+            )
             .order_by("sku")[:limit]
         )
         serializer = self.get_serializer(queryset, many=True)
@@ -151,6 +177,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="reserve")
     def reserve(self, request, pk=None):
+        company = self.get_company()
         product = self.get_object()
         try:
             quantity = Decimal(str(request.data.get("quantity")))
@@ -176,7 +203,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             product.save(update_fields=["reserved_stock"])
             AuditLog.objects.create(
                 action="Reserva de stock",
-                user=get_or_create_system_user(),
+                user=request.user,
+                company=company,
                 metadata={
                     "product_id": product.id,
                     "sku": product.sku,
@@ -191,6 +219,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="release-reservation")
     def release_reservation(self, request, pk=None):
+        company = self.get_company()
         product = self.get_object()
         try:
             quantity = Decimal(str(request.data.get("quantity")))
@@ -216,7 +245,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             product.save(update_fields=["reserved_stock"])
             AuditLog.objects.create(
                 action="Liberacion de reserva",
-                user=get_or_create_system_user(),
+                user=request.user,
+                company=company,
                 metadata={
                     "product_id": product.id,
                     "sku": product.sku,
@@ -231,6 +261,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="dispatch-reservation")
     def dispatch_reservation(self, request, pk=None):
+        company = self.get_company()
         product = self.get_object()
         try:
             quantity = Decimal(str(request.data.get("quantity")))
@@ -249,7 +280,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Debe indicar un almacen para despachar."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            deposit = Deposit.objects.get(id=deposit_id)
+            deposit = Deposit.objects.get(id=deposit_id, company=company)
         except Deposit.DoesNotExist:
             return Response({"detail": "El almacen indicado no existe."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -263,8 +294,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 register_movement(
-                    get_or_create_system_user(),
+                    request.user,
                     {
+                        "company": company,
                         "product": product,
                         "deposit": deposit,
                         "movement_type": Movement.MovementType.SALE,
@@ -278,7 +310,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                 product.save(update_fields=["reserved_stock"])
                 AuditLog.objects.create(
                     action="Despacho de reserva",
-                    user=get_or_create_system_user(),
+                    user=request.user,
+                    company=company,
                     metadata={
                         "product_id": product.id,
                         "sku": product.sku,
@@ -297,6 +330,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="bulk-price-update")
     def bulk_price_update(self, request):
+        company = self.get_company()
         try:
             percentage = Decimal(str(request.data.get("percentage")))
         except Exception:
@@ -313,12 +347,12 @@ class ProductViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        products_qs = Product.objects.all()
+        products_qs = Product.objects.filter(company=company)
         if category_id not in (None, "", "null"):
             products_qs = products_qs.filter(category_id=category_id)
 
         updated_count = 0
-        audit_user = get_or_create_system_user()
+        audit_user = request.user
         for product in products_qs:
             new_price = (product.sale_price * multiplier).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
@@ -333,6 +367,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 AuditLog.objects.create(
                     action="Actualizacion masiva de precio",
                     user=audit_user,
+                    company=company,
                     metadata={
                         "product_id": product.id,
                         "sku": product.sku,
@@ -353,16 +388,17 @@ class ProductViewSet(viewsets.ModelViewSet):
         )
 
 
-class MovementViewSet(viewsets.ModelViewSet):
+class MovementViewSet(CompanyScopedModelViewSet):
     queryset = Movement.objects.select_related("product", "deposit", "user").all()
     serializer_class = MovementSerializer
-    permission_classes = [AllowAny]
     filterset_fields = ["product", "deposit", "movement_type"]
 
     @action(detail=False, methods=["get"], url_path="kardex")
     def kardex(self, request):
+        company = self.get_company()
         queryset = (
             Movement.objects.select_related("product", "deposit")
+            .filter(company=company)
             .all()
             .order_by("created_at", "id")
         )
@@ -441,37 +477,38 @@ class MovementViewSet(viewsets.ModelViewSet):
         return paginator.get_paginated_response(page)
 
 
-class ClientViewSet(viewsets.ModelViewSet):
+class ClientViewSet(CompanyScopedModelViewSet):
     queryset = Client.objects.all()
     serializer_class = ClientSerializer
     permission_classes = [IsAdminOrReadOnly]
 
 
-class SupplierViewSet(viewsets.ModelViewSet):
+class SupplierViewSet(CompanyScopedModelViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
     permission_classes = [IsAdminOrReadOnly]
 
 
-class PriceListViewSet(viewsets.ModelViewSet):
+class PriceListViewSet(CompanyScopedModelViewSet):
     queryset = PriceList.objects.all()
     serializer_class = PriceListSerializer
     permission_classes = [IsAdminOrReadOnly]
 
 
-class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+class AuditLogViewSet(CompanyScopedReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("user").all()
     serializer_class = AuditLogSerializer
     permission_classes = [IsAdminOrReadOnly]
 
 
 class StockAlertsView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        company = require_company(request.user)
         try:
             alerts = []
-            for product in Product.objects.all():
+            for product in Product.objects.filter(company=company):
                 current_stock = calculate_stock(product)
                 if current_stock < product.stock_minimum:
                     alerts.append(
@@ -495,9 +532,10 @@ class StockAlertsView(APIView):
 
 
 class StockSummaryView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        company = require_company(request.user)
         try:
             signed_quantity = Case(
                 When(movement_type__in=POSITIVE_TYPES, then=F("quantity")),
@@ -509,7 +547,7 @@ class StockSummaryView(APIView):
                 output_field=DecimalField(max_digits=12, decimal_places=2),
             )
             summary = (
-                Movement.objects.values(
+                Movement.objects.filter(company=company).values(
                     "product_id",
                     "deposit_id",
                     "product__sku",
@@ -544,9 +582,10 @@ class StockSummaryView(APIView):
 
 
 class ActiveReservationsView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        company = require_company(request.user)
         try:
             reservation_actions = {
                 "Reserva de stock": Decimal("1"),
@@ -554,7 +593,7 @@ class ActiveReservationsView(APIView):
                 "Despacho de reserva": Decimal("-1"),
             }
             logs = (
-                AuditLog.objects.filter(action__in=reservation_actions.keys())
+                AuditLog.objects.filter(action__in=reservation_actions.keys(), company=company)
                 .order_by("created_at")
                 .values("action", "created_at", "metadata")
             )
@@ -594,7 +633,7 @@ class ActiveReservationsView(APIView):
                 if not by_key[key]["sku"]:
                     by_key[key]["sku"] = str(metadata.get("sku") or "")
 
-            products_by_id = Product.objects.in_bulk(product_ids)
+            products_by_id = Product.objects.filter(company=company).in_bulk(product_ids)
             active_rows = []
             for item in by_key.values():
                 if item["reserved_quantity"] <= 0:

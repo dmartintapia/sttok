@@ -11,8 +11,28 @@ class TimestampedModel(models.Model):
         abstract = True
 
 
+class Company(TimestampedModel):
+    name = models.CharField(max_length=120, unique=True)
+    code = models.SlugField(max_length=60, unique=True)
+
+    class Meta:
+        verbose_name_plural = "companies"
+
+    def __str__(self):
+        return self.name
+
+
+class UserCompany(TimestampedModel):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name="users")
+
+    def __str__(self):
+        return f"{self.user} -> {self.company.code}"
+
+
 class Category(TimestampedModel):
     name = models.CharField(max_length=100, unique=True)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -21,6 +41,7 @@ class Category(TimestampedModel):
 class Unit(TimestampedModel):
     name = models.CharField(max_length=50, unique=True)
     symbol = models.CharField(max_length=10)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.symbol})"
@@ -29,6 +50,7 @@ class Unit(TimestampedModel):
 class Deposit(TimestampedModel):
     name = models.CharField(max_length=100, unique=True)
     location = models.CharField(max_length=150, blank=True)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -37,6 +59,7 @@ class Deposit(TimestampedModel):
 class Product(TimestampedModel):
     sku = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=200)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT)
     unit = models.ForeignKey(Unit, on_delete=models.PROTECT)
     stock_minimum = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -58,6 +81,7 @@ class Client(TimestampedModel):
     name = models.CharField(max_length=150)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -67,6 +91,7 @@ class Supplier(TimestampedModel):
     name = models.CharField(max_length=150)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -75,6 +100,7 @@ class Supplier(TimestampedModel):
 class PriceList(TimestampedModel):
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -89,6 +115,7 @@ class Movement(TimestampedModel):
 
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     deposit = models.ForeignKey(Deposit, on_delete=models.PROTECT)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
     movement_type = models.CharField(max_length=20, choices=MovementType.choices)
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -108,6 +135,7 @@ class Movement(TimestampedModel):
 class AuditLog(models.Model):
     action = models.CharField(max_length=200)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     metadata = models.JSONField(default=dict, blank=True)
 

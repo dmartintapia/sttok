@@ -52,6 +52,7 @@ def calculate_available_stock(product):
 def register_movement(user, data):
     product = data["product"]
     deposit = data["deposit"]
+    company = data.get("company") or getattr(product, "company", None)
     movement_type = data["movement_type"]
     quantity = data["quantity"]
     cost = data.get("cost", Decimal("0"))
@@ -80,6 +81,7 @@ def register_movement(user, data):
         cost = product.average_cost
 
     movement = Movement.objects.create(
+        company=company,
         product=product,
         deposit=deposit,
         movement_type=movement_type,
@@ -92,6 +94,7 @@ def register_movement(user, data):
     AuditLog.objects.create(
         action="Movimiento registrado",
         user=user,
+        company=company,
         metadata={
             "product": product.sku,
             "deposit": deposit.name,
