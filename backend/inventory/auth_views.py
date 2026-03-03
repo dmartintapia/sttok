@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Company, UserCompany
-from .tenancy import get_user_company
+from .tenancy import get_user_company, get_user_company_link, has_any_role
 
 
 class LoginView(APIView):
@@ -61,6 +61,7 @@ class LoginView(APIView):
                     "name": company.name,
                     "code": company.code,
                 },
+                "role": membership.role,
             },
             status=status.HTTP_200_OK,
         )
@@ -70,8 +71,9 @@ class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        company = get_user_company(request.user)
-        if not company:
+        membership = get_user_company_link(request.user)
+        company = membership.company if membership else None
+        if not membership or not company:
             return Response({"detail": "Usuario sin empresa asignada."}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(
@@ -85,6 +87,68 @@ class MeView(APIView):
                     "name": company.name,
                     "code": company.code,
                 },
+                "role": membership.role,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class CompanyUsersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        membership = get_user_company_link(request.user)
+        if not membership:
+            return Response({"detail": "Usuario sin empresa asignada."}, status=status.HTTP_403_FORBIDDEN)
+        if not has_any_role(request.user, [UserCompany.Role.OWNER, UserCompany.Role.ADMIN]):
+            return Response({"detail": "No autorizado."}, status=status.HTTP_403_FORBIDDEN)
+
+        rows = UserCompany.objects.select_related("user", "company").filter(company=membership.company).order_by("user__username")
+        return Response(
+            [
+                {
+                    "id": row.user.id,
+                    "username": row.user.username,
+                    "role": row.role,
+                    "company_code": row.company.code,
+                }
+                for row in rows
+            ],
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        membership = get_user_company_link(request.user)
+        if not membership:
+            return Response({"detail": "Usuario sin empresa asignada."}, status=status.HTTP_403_FORBIDDEN)
+        if not has_any_role(request.user, [UserCompany.Role.OWNER, UserCompany.Role.ADMIN]):
+            return Response({"detail": "No autorizado."}, status=status.HTTP_403_FORBIDDEN)
+
+        username = str(request.data.get("username", "")).strip()
+        password = str(request.data.get("password", "")).strip()
+        role = str(request.data.get("role", UserCompany.Role.OPERATOR)).strip().lower()
+
+        allowed_roles = {r for r, _ in UserCompany.Role.choices}
+        if role not in allowed_roles:
+            return Response({"detail": "Rol invalido."}, status=status.HTTP_400_BAD_REQUEST)
+        if role == UserCompany.Role.OWNER and not has_any_role(request.user, [UserCompany.Role.OWNER]):
+            return Response({"detail": "Solo owner puede crear otro owner."}, status=status.HTTP_403_FORBIDDEN)
+        if not username or not password:
+            return Response({"detail": "Usuario y contrasena son obligatorios."}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        if User.objects.filter(username=username).exists():
+            return Response({"detail": "El usuario ya existe."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(username=username, password=password, is_active=True)
+        UserCompany.objects.create(user=user, company=membership.company, role=role)
+
+        return Response(
+            {
+                "id": user.id,
+                "username": user.username,
+                "role": role,
+                "company_code": membership.company.code,
+            },
+            status=status.HTTP_201_CREATED,
         )

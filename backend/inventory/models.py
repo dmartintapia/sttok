@@ -23,8 +23,15 @@ class Company(TimestampedModel):
 
 
 class UserCompany(TimestampedModel):
+    class Role(models.TextChoices):
+        OWNER = "owner", "Owner"
+        ADMIN = "admin", "Admin"
+        OPERATOR = "operator", "Operador"
+        VIEWER = "viewer", "Lector"
+
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name="users")
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.OWNER)
 
     def __str__(self):
         return f"{self.user} -> {self.company.code}"

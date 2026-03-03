@@ -40,6 +40,7 @@ from .serializers import (
 from .services import calculate_stock, POSITIVE_TYPES, NEGATIVE_TYPES
 from .services import register_movement, calculate_available_stock
 from .tenancy import require_company
+from .permissions_roles import CompanyRolePermission
 
 logger = logging.getLogger("inventory")
 
@@ -85,7 +86,8 @@ def _api_type_to_ui_type(movement_type, notes):
 
 
 class CompanyScopedModelViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CompanyRolePermission]
+    required_roles_by_action = {}
 
     def get_company(self):
         return require_company(self.request.user)
@@ -112,6 +114,12 @@ class CompanyScopedReadOnlyModelViewSet(viewsets.ReadOnlyModelViewSet):
 class CategoryViewSet(CompanyScopedModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    required_roles_by_action = {
+        "create": ["owner", "admin"],
+        "update": ["owner", "admin"],
+        "partial_update": ["owner", "admin"],
+        "destroy": ["owner", "admin"],
+    }
 
 
 class UnitViewSet(CompanyScopedModelViewSet):
@@ -129,6 +137,16 @@ class ProductViewSet(CompanyScopedModelViewSet):
     serializer_class = ProductSerializer
     filter_backends = [SearchFilter]
     search_fields = ["sku", "name"]
+    required_roles_by_action = {
+        "create": ["owner", "admin"],
+        "update": ["owner", "admin"],
+        "partial_update": ["owner", "admin"],
+        "destroy": ["owner", "admin"],
+        "bulk_price_update": ["owner", "admin"],
+        "reserve": ["owner", "admin", "operator"],
+        "release_reservation": ["owner", "admin", "operator"],
+        "dispatch_reservation": ["owner", "admin", "operator"],
+    }
 
     @action(detail=False, methods=["get"], url_path="catalog")
     def catalog(self, request):
@@ -392,6 +410,12 @@ class MovementViewSet(CompanyScopedModelViewSet):
     queryset = Movement.objects.select_related("product", "deposit", "user").all()
     serializer_class = MovementSerializer
     filterset_fields = ["product", "deposit", "movement_type"]
+    required_roles_by_action = {
+        "create": ["owner", "admin", "operator"],
+        "update": ["owner", "admin"],
+        "partial_update": ["owner", "admin"],
+        "destroy": ["owner", "admin"],
+    }
 
     @action(detail=False, methods=["get"], url_path="kardex")
     def kardex(self, request):
@@ -480,19 +504,37 @@ class MovementViewSet(CompanyScopedModelViewSet):
 class ClientViewSet(CompanyScopedModelViewSet):
     queryset = Client.objects.all()
     serializer_class = ClientSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated, CompanyRolePermission]
+    required_roles_by_action = {
+        "create": ["owner", "admin"],
+        "update": ["owner", "admin"],
+        "partial_update": ["owner", "admin"],
+        "destroy": ["owner", "admin"],
+    }
 
 
 class SupplierViewSet(CompanyScopedModelViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated, CompanyRolePermission]
+    required_roles_by_action = {
+        "create": ["owner", "admin"],
+        "update": ["owner", "admin"],
+        "partial_update": ["owner", "admin"],
+        "destroy": ["owner", "admin"],
+    }
 
 
 class PriceListViewSet(CompanyScopedModelViewSet):
     queryset = PriceList.objects.all()
     serializer_class = PriceListSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated, CompanyRolePermission]
+    required_roles_by_action = {
+        "create": ["owner", "admin"],
+        "update": ["owner", "admin"],
+        "partial_update": ["owner", "admin"],
+        "destroy": ["owner", "admin"],
+    }
 
 
 class AuditLogViewSet(CompanyScopedReadOnlyModelViewSet):
@@ -659,3 +701,15 @@ class ActiveReservationsView(APIView):
                 {"detail": "Error al calcular reservas activas", "error": str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+    required_roles_by_action = {
+        "create": ["owner", "admin"],
+        "update": ["owner", "admin"],
+        "partial_update": ["owner", "admin"],
+        "destroy": ["owner", "admin"],
+    }
+    required_roles_by_action = {
+        "create": ["owner", "admin"],
+        "update": ["owner", "admin"],
+        "partial_update": ["owner", "admin"],
+        "destroy": ["owner", "admin"],
+    }

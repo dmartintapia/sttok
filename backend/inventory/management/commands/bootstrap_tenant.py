@@ -35,7 +35,10 @@ class Command(BaseCommand):
         user.set_password(password)
         user.save()
 
-        UserCompany.objects.update_or_create(user=user, defaults={"company": company})
+        UserCompany.objects.update_or_create(
+            user=user,
+            defaults={"company": company, "role": UserCompany.Role.OWNER},
+        )
 
         status = "creado" if created else "actualizado"
         self.stdout.write(
