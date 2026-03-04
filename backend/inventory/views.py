@@ -226,6 +226,41 @@ class ProductViewSet(CompanyScopedModelViewSet):
         if not reason:
             return Response({"detail": "El motivo de reserva es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
 
+        deposit_id = request.data.get("deposit")
+        if not deposit_id:
+            return Response(
+                {"detail": "Debe indicar el almacen desde donde se reserva."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            deposit = Deposit.objects.get(id=deposit_id, company=company)
+        except Deposit.DoesNotExist:
+            return Response({"detail": "El almacen indicado no existe."}, status=status.HTTP_400_BAD_REQUEST)
+
+        signed_quantity = Case(
+            When(movement_type__in=POSITIVE_TYPES, then=F("quantity")),
+            When(
+                movement_type__in=NEGATIVE_TYPES,
+                then=ExpressionWrapper(-1 * F("quantity"), output_field=DecimalField()),
+            ),
+            default=Value(0),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+        stock_in_deposit = (
+            Movement.objects.filter(company=company, product=product, deposit=deposit)
+            .aggregate(current_stock=Sum(signed_quantity))
+            .get("current_stock")
+            or Decimal("0")
+        )
+        if quantity > stock_in_deposit:
+            return Response(
+                {
+                    "detail": f"No hay stock suficiente en {deposit.name} para reservar esa cantidad.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         available = calculate_available_stock(product)
         if quantity > available:
             return Response(
@@ -246,6 +281,8 @@ class ProductViewSet(CompanyScopedModelViewSet):
                     "quantity": str(quantity),
                     "reason": reason,
                     "reference": request.data.get("reference", ""),
+                    "deposit_id": deposit.id,
+                    "deposit_name": deposit.name,
                 },
             )
 
@@ -268,6 +305,18 @@ class ProductViewSet(CompanyScopedModelViewSet):
         if not reason:
             return Response({"detail": "El motivo de liberacion es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
 
+        deposit_id = request.data.get("deposit")
+        if not deposit_id:
+            return Response(
+                {"detail": "Debe indicar el almacen de la reserva a liberar."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            deposit = Deposit.objects.get(id=deposit_id, company=company)
+        except Deposit.DoesNotExist:
+            return Response({"detail": "El almacen indicado no existe."}, status=status.HTTP_400_BAD_REQUEST)
+
         reserved = product.reserved_stock or Decimal("0")
         if quantity > reserved:
             return Response(
@@ -288,6 +337,8 @@ class ProductViewSet(CompanyScopedModelViewSet):
                     "quantity": str(quantity),
                     "reason": reason,
                     "reference": request.data.get("reference", ""),
+                    "deposit_id": deposit.id,
+                    "deposit_name": deposit.name,
                 },
             )
 
@@ -665,7 +716,8 @@ class ActiveReservationsView(APIView):
                 if not product_id:
                     continue
                 reference = str(metadata.get("reference") or "SIN-REFERENCIA").strip()
-                key = (int(product_id), reference)
+                deposit_id = int(metadata.get("deposit_id") or 0)
+                key = (int(product_id), reference, deposit_id)
                 product_ids.add(int(product_id))
 
                 try:
@@ -678,11 +730,12 @@ class ActiveReservationsView(APIView):
                     by_key[key] = {
                         "product_id": int(product_id),
                         "reference": reference,
+                        "deposit_id": deposit_id,
                         "reserved_quantity": Decimal("0"),
                         "last_update": log["created_at"],
                         "reason": str(metadata.get("reason") or "").strip(),
                         "sku": str(metadata.get("sku") or ""),
-                        "deposit_name": str(metadata.get("deposit_name") or "").strip(),
+                        "deposit_name": str(metadata.get("deposit_name") or "N/D").strip(),
                     }
 
                 by_key[key]["reserved_quantity"] += signed_qty

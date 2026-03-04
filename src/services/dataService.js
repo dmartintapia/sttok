@@ -577,10 +577,11 @@ export async function updateProducto(productoId, payload) {
   }
 }
 
-export async function reservarProducto({ productoId, cantidad, motivo, referencia }) {
+export async function reservarProducto({ productoId, almacenId, cantidad, motivo, referencia }) {
   const updated = await apiFetch(`/products/${productoId}/reserve/`, {
     method: 'POST',
     body: {
+      deposit: Number(almacenId),
       quantity: toNumber(cantidad),
       reason: motivo,
       reference: referencia || '',
@@ -590,10 +591,11 @@ export async function reservarProducto({ productoId, cantidad, motivo, referenci
   return productos.find((p) => p.id === Number(updated.id))
 }
 
-export async function liberarReservaProducto({ productoId, cantidad, motivo, referencia }) {
+export async function liberarReservaProducto({ productoId, almacenId, cantidad, motivo, referencia }) {
   const updated = await apiFetch(`/products/${productoId}/release-reservation/`, {
     method: 'POST',
     body: {
+      deposit: Number(almacenId),
       quantity: toNumber(cantidad),
       reason: motivo,
       reference: referencia || '',

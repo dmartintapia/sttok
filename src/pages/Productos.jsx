@@ -150,10 +150,15 @@ function ProductDetailDrawer({ product, isOpen, onClose, onStockUpdated, onProdu
 
   const handleReservar = async () => {
     setReservaError('')
+    if (!ajusteForm.almacenId) {
+      setReservaError('Seleccioná el almacén desde donde se reserva.')
+      return
+    }
     setReservaLoading(true)
     try {
       const updated = await reservarProducto({
         productoId: product.id,
+        almacenId: ajusteForm.almacenId,
         cantidad: reservaForm.cantidad,
         motivo: reservaForm.motivo,
         referencia: reservaForm.referencia,
@@ -168,10 +173,15 @@ function ProductDetailDrawer({ product, isOpen, onClose, onStockUpdated, onProdu
 
   const handleLiberarReserva = async () => {
     setReservaError('')
+    if (!ajusteForm.almacenId) {
+      setReservaError('Seleccioná el almacén de la reserva que querés liberar.')
+      return
+    }
     setReservaLoading(true)
     try {
       const updated = await liberarReservaProducto({
         productoId: product.id,
+        almacenId: ajusteForm.almacenId,
         cantidad: reservaForm.cantidad,
         motivo: reservaForm.motivo,
         referencia: reservaForm.referencia,
@@ -416,7 +426,7 @@ function ProductDetailDrawer({ product, isOpen, onClose, onStockUpdated, onProdu
               <input className="form-control form-control-sm" value={reservaForm.referencia} onChange={(e) => setReservaForm((p) => ({ ...p, referencia: e.target.value }))} placeholder="Ej: PED-1024" />
             </div>
             <div className="mt-2">
-              <label className="filter-label">Almacén para despacho</label>
+              <label className="filter-label">Almacén de reserva / despacho</label>
               <select className="form-select form-select-sm" value={ajusteForm.almacenId} onChange={(e) => setAjusteForm((p) => ({ ...p, almacenId: e.target.value }))}>
                 {almacenes.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
               </select>
