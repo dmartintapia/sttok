@@ -1,5 +1,3 @@
-import { alertasMock } from '../mock/data'
-
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/$/, '')
 const AUTH_STORAGE_KEY = 'sttok_auth_session'
 
@@ -394,7 +392,7 @@ export async function getDashboardData() {
       reserved_quantity: toNumber(item.reserved_quantity),
       last_update: item.last_update ? String(item.last_update).slice(0, 10) : '',
     })),
-    alertas: alertas.length ? alertas : alertasMock,
+    alertas,
   }
 }
 

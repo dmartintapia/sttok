@@ -1,8 +1,9 @@
 import json
 import os
+import uuid
 from urllib import parse, request as urlrequest
 
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils.text import slugify
 from rest_framework import status
@@ -36,6 +37,24 @@ def _build_company_code(raw_name, raw_code=""):
     if not base:
         base = slugify(str(raw_name or "").strip().lower())
     return base[:60]
+
+
+def _build_internal_username(company_code, login_username):
+    User = get_user_model()
+    safe_company = slugify(str(company_code or "").strip().lower())[:24] or "co"
+    safe_login = slugify(str(login_username or "").strip().lower())[:24] or "user"
+    candidate = f"{safe_company}__{safe_login}"
+    if len(candidate) > 150:
+        candidate = candidate[:150]
+
+    if not User.objects.filter(username=candidate).exists():
+        return candidate
+
+    while True:
+        suffix = uuid.uuid4().hex[:8]
+        alt = f"{candidate[: max(1, 150 - 9)]}_{suffix}"
+        if not User.objects.filter(username=alt).exists():
+            return alt
 
 
 def _verify_turnstile(token, ip_address):
@@ -101,20 +120,24 @@ class LoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = authenticate(request=request, username=username, password=password)
-        if not user:
+        membership = (
+            UserCompany.objects.select_related("user")
+            .filter(company=company, login_username__iexact=username)
+            .first()
+        )
+        if not membership or not membership.user:
             register_login_failure(company_code, username.lower(), ip_address, LOGIN_LOCK_SECONDS)
             return Response(
                 {"detail": "Credenciales invalidas."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        membership = UserCompany.objects.filter(user=user, company=company).first()
-        if not membership:
+        user = membership.user
+        if not user.is_active or not user.check_password(password):
             register_login_failure(company_code, username.lower(), ip_address, LOGIN_LOCK_SECONDS)
             return Response(
-                {"detail": "El usuario no pertenece a la empresa indicada."},
-                status=status.HTTP_403_FORBIDDEN,
+                {"detail": "Credenciales invalidas."},
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
         clear_login_failures(company_code, username.lower(), ip_address)
@@ -129,7 +152,7 @@ class LoginView(APIView):
                 "access": str(refresh.access_token),
                 "user": {
                     "id": user.id,
-                    "username": user.username,
+                    "username": membership.login_username or user.username,
                 },
                 "company": {
                     "id": company.id,
@@ -183,10 +206,9 @@ class PublicSignupView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        User = get_user_model()
-        if User.objects.filter(username__iexact=username).exists():
+        if UserCompany.objects.filter(company__code__iexact=company_code, login_username__iexact=username).exists():
             return Response(
-                {"detail": "El usuario ya existe. Elige otro."},
+                {"detail": "El usuario ya existe en esa empresa. Elige otro."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -196,9 +218,21 @@ class PublicSignupView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        User = get_user_model()
         company = Company.objects.create(name=company_name, code=company_code)
-        user = User.objects.create_user(username=username, password=password, email=email, is_active=True)
-        UserCompany.objects.create(user=user, company=company, role=UserCompany.Role.OWNER)
+        internal_username = _build_internal_username(company.code, username)
+        user = User.objects.create_user(
+            username=internal_username,
+            password=password,
+            email=email,
+            is_active=True,
+        )
+        UserCompany.objects.create(
+            user=user,
+            company=company,
+            role=UserCompany.Role.OWNER,
+            login_username=username,
+        )
 
         refresh = RefreshToken.for_user(user)
         refresh["company_id"] = company.id
@@ -210,7 +244,7 @@ class PublicSignupView(APIView):
                 "access": str(refresh.access_token),
                 "user": {
                     "id": user.id,
-                    "username": user.username,
+                    "username": username,
                     "email": user.email,
                 },
                 "company": {
@@ -242,7 +276,7 @@ class MeView(APIView):
             {
                 "user": {
                     "id": request.user.id,
-                    "username": request.user.username,
+                    "username": membership.login_username or request.user.username,
                 },
                 "company": {
                     "id": company.id,
@@ -270,7 +304,7 @@ class CompanyUsersView(APIView):
             [
                 {
                     "id": row.user.id,
-                    "username": row.user.username,
+                    "username": row.login_username or row.user.username,
                     "role": row.role,
                     "company_code": row.company.code,
                 }
@@ -298,17 +332,29 @@ class CompanyUsersView(APIView):
         if not username or not password:
             return Response({"detail": "Usuario y contrasena son obligatorios."}, status=status.HTTP_400_BAD_REQUEST)
 
-        User = get_user_model()
-        if User.objects.filter(username=username).exists():
-            return Response({"detail": "El usuario ya existe."}, status=status.HTTP_400_BAD_REQUEST)
+        if UserCompany.objects.filter(
+            company=membership.company,
+            login_username__iexact=username,
+        ).exists():
+            return Response(
+                {"detail": "El usuario ya existe en esta empresa."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        user = User.objects.create_user(username=username, password=password, is_active=True)
-        UserCompany.objects.create(user=user, company=membership.company, role=role)
+        User = get_user_model()
+        internal_username = _build_internal_username(membership.company.code, username)
+        user = User.objects.create_user(username=internal_username, password=password, is_active=True)
+        UserCompany.objects.create(
+            user=user,
+            company=membership.company,
+            role=role,
+            login_username=username,
+        )
 
         return Response(
             {
                 "id": user.id,
-                "username": user.username,
+                "username": username,
                 "role": role,
                 "company_code": membership.company.code,
             },

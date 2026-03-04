@@ -31,7 +31,16 @@ class UserCompany(TimestampedModel):
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name="users")
+    login_username = models.CharField(max_length=50, null=True, blank=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.OWNER)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "login_username"],
+                name="uq_usercompany_company_login_username",
+            )
+        ]
 
     def __str__(self):
         return f"{self.user} -> {self.company.code}"

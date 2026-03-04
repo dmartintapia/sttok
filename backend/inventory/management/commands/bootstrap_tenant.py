@@ -1,7 +1,27 @@
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
+from django.utils.text import slugify
+import uuid
 
 from inventory.models import Company, UserCompany
+
+
+def build_internal_username(company_code, login_username):
+    User = get_user_model()
+    safe_company = slugify(str(company_code or "").strip().lower())[:24] or "co"
+    safe_login = slugify(str(login_username or "").strip().lower())[:24] or "user"
+    candidate = f"{safe_company}__{safe_login}"
+    if len(candidate) > 150:
+        candidate = candidate[:150]
+
+    if not User.objects.filter(username=candidate).exists():
+        return candidate
+
+    while True:
+        suffix = uuid.uuid4().hex[:8]
+        alt = f"{candidate[: max(1, 150 - 9)]}_{suffix}"
+        if not User.objects.filter(username=alt).exists():
+            return alt
 
 
 class Command(BaseCommand):
@@ -28,7 +48,20 @@ class Command(BaseCommand):
             company.name = name
             company.save(update_fields=["name"])
 
-        user, created = User.objects.get_or_create(username=username)
+        membership = (
+            UserCompany.objects.select_related("user")
+            .filter(company=company, login_username__iexact=username)
+            .first()
+        )
+
+        if membership:
+            user = membership.user
+            created = False
+        else:
+            internal_username = build_internal_username(company.code, username)
+            user = User.objects.create(username=internal_username)
+            created = True
+
         user.is_active = True
         user.is_staff = True
         user.is_superuser = True
@@ -37,12 +70,16 @@ class Command(BaseCommand):
 
         UserCompany.objects.update_or_create(
             user=user,
-            defaults={"company": company, "role": UserCompany.Role.OWNER},
+            defaults={
+                "company": company,
+                "role": UserCompany.Role.OWNER,
+                "login_username": username,
+            },
         )
 
         status = "creado" if created else "actualizado"
         self.stdout.write(
             self.style.SUCCESS(
-                f"Bootstrap OK | empresa={company.code} usuario={user.username} ({status})"
+                f"Bootstrap OK | empresa={company.code} usuario={username} ({status})"
             )
         )
