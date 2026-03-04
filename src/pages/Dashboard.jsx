@@ -184,6 +184,7 @@ function Dashboard() {
                       <th className="ps-4 text-muted small" style={{ fontSize: '11px' }}>PRODUCTO</th>
                       <th className="text-muted small" style={{ fontSize: '11px' }}>SKU</th>
                       <th className="text-muted small" style={{ fontSize: '11px' }}>REFERENCIA</th>
+                      <th className="text-muted small" style={{ fontSize: '11px' }}>ALMACÉN</th>
                       <th className="text-muted small text-end" style={{ fontSize: '11px' }}>RESERVADO</th>
                       <th className="pe-4 text-muted small text-end" style={{ fontSize: '11px' }}>ÚLT. ACT</th>
                     </tr>
@@ -195,13 +196,14 @@ function Dashboard() {
                           <td className="ps-4 fw-semibold">{r.product_name}</td>
                           <td>{r.sku}</td>
                           <td>{r.reference}</td>
+                          <td>{r.deposit_name || 'N/D'}</td>
                           <td className="text-end fw-bold text-warning">{r.reserved_quantity}</td>
                           <td className="pe-4 text-end text-muted">{r.last_update}</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="5" className="text-center py-4 text-muted">No hay reservas activas.</td>
+                        <td colSpan="6" className="text-center py-4 text-muted">No hay reservas activas.</td>
                       </tr>
                     )}
                   </tbody>

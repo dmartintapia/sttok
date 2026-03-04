@@ -390,6 +390,7 @@ export async function getDashboardData() {
     activeReservations: unwrapList(reservationsApi).map((item) => ({
       ...item,
       reserved_quantity: toNumber(item.reserved_quantity),
+      deposit_name: item.deposit_name || 'N/D',
       last_update: item.last_update ? String(item.last_update).slice(0, 10) : '',
     })),
     alertas,
@@ -402,6 +403,7 @@ export async function getReservasActivas() {
     product_id: Number(item.product_id),
     sku: item.sku,
     product_name: item.product_name,
+    deposit_name: item.deposit_name || 'N/D',
     reference: item.reference,
     reason: item.reason || '',
     reserved_quantity: toNumber(item.reserved_quantity),

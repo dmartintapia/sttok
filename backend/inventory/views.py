@@ -682,6 +682,7 @@ class ActiveReservationsView(APIView):
                         "last_update": log["created_at"],
                         "reason": str(metadata.get("reason") or "").strip(),
                         "sku": str(metadata.get("sku") or ""),
+                        "deposit_name": str(metadata.get("deposit_name") or "").strip(),
                     }
 
                 by_key[key]["reserved_quantity"] += signed_qty
@@ -691,6 +692,9 @@ class ActiveReservationsView(APIView):
                     by_key[key]["reason"] = reason
                 if not by_key[key]["sku"]:
                     by_key[key]["sku"] = str(metadata.get("sku") or "")
+                deposit_name = str(metadata.get("deposit_name") or "").strip()
+                if deposit_name:
+                    by_key[key]["deposit_name"] = deposit_name
 
             products_by_id = Product.objects.filter(company=company).in_bulk(product_ids)
             active_rows = []
@@ -705,6 +709,7 @@ class ActiveReservationsView(APIView):
                         "product_name": product.name if product else f"Producto {item['product_id']}",
                         "reference": item["reference"],
                         "reason": item["reason"],
+                        "deposit_name": item["deposit_name"] or "N/D",
                         "reserved_quantity": item["reserved_quantity"],
                         "last_update": item["last_update"],
                     }
