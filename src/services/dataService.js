@@ -102,6 +102,24 @@ export async function login({ company, username, password }) {
   return data
 }
 
+export async function signup({ companyName, companyCode, email, username, password, captchaToken = '' }) {
+  const data = await apiFetch('/auth/signup/', {
+    method: 'POST',
+    body: {
+      company_name: companyName,
+      company_code: companyCode,
+      email,
+      username,
+      password,
+      captcha_token: captchaToken,
+    },
+    headers: {},
+  })
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data))
+  window.dispatchEvent(new CustomEvent('auth:changed'))
+  return data
+}
+
 export async function getCurrentSessionProfile() {
   const me = await apiFetch('/auth/me/')
   const session = getAuthSession()

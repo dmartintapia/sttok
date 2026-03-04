@@ -16,6 +16,16 @@ npm install
 npm run dev
 ```
 
+Variables importantes:
+
+```bash
+VITE_API_URL=http://localhost:8000/api
+VITE_SUPPORT_CONTACT=contacto@tu-dominio.com
+FREE_PLAN_MAX_SKUS=100
+SUPPORT_CONTACT=contacto@tu-dominio.com
+TURNSTILE_SECRET_KEY=
+```
+
 Build y preview:
 
 ```bash

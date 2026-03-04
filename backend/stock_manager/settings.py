@@ -118,6 +118,12 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": (
         "django_filters.rest_framework.DjangoFilterBackend",
     ),
+    "DEFAULT_THROTTLE_RATES": {
+        "login_ip": "20/hour",
+        "login_email": "12/hour",
+        "signup_ip": "6/hour",
+        "signup_email": "4/day",
+    },
 }
 
 SIMPLE_JWT = {

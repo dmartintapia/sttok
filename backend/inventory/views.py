@@ -1,4 +1,5 @@
 import logging
+import os
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
 from django.db.models import F, Case, When, Value, DecimalField, Sum, ExpressionWrapper, Q, Max
@@ -43,6 +44,8 @@ from .tenancy import require_company
 from .permissions_roles import CompanyRolePermission
 
 logger = logging.getLogger("inventory")
+FREE_PLAN_MAX_SKUS = int(os.getenv("FREE_PLAN_MAX_SKUS", "100"))
+SUPPORT_CONTACT = os.getenv("SUPPORT_CONTACT", "contacto@tu-dominio.com")
 
 
 class ProductCatalogPagination(PageNumberPagination):
@@ -147,6 +150,20 @@ class ProductViewSet(CompanyScopedModelViewSet):
         "release_reservation": ["owner", "admin", "operator"],
         "dispatch_reservation": ["owner", "admin", "operator"],
     }
+
+    def create(self, request, *args, **kwargs):
+        company = self.get_company()
+        current_skus = Product.objects.filter(company=company).count()
+        if current_skus >= FREE_PLAN_MAX_SKUS:
+            return Response(
+                {
+                    "detail": f"Plan gratis alcanzado: maximo {FREE_PLAN_MAX_SKUS} SKU. Escribinos para ampliar.",
+                    "upgrade_contact": SUPPORT_CONTACT,
+                    "max_skus": FREE_PLAN_MAX_SKUS,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().create(request, *args, **kwargs)
 
     @action(detail=False, methods=["get"], url_path="catalog")
     def catalog(self, request):
