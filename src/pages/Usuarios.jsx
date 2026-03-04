@@ -159,6 +159,75 @@ function Usuarios() {
           </div>
         </div>
       </div>
+
+      <div className="row g-4 mt-1">
+        <div className="col-12">
+          <div className="ent-card">
+            <div className="ent-card-header">
+              <span className="ent-card-title">Permisos por rol</span>
+            </div>
+            <div className="ent-card-body p-0">
+              <div className="table-responsive">
+                <table className="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th className="ps-4">Acción</th>
+                      <th>Owner</th>
+                      <th>Admin</th>
+                      <th>Operador</th>
+                      <th className="pe-4">Viewer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="ps-4">Ver dashboard, productos y reportes</td>
+                      <td>Si</td>
+                      <td>Si</td>
+                      <td>Si</td>
+                      <td className="pe-4">Si</td>
+                    </tr>
+                    <tr>
+                      <td className="ps-4">Registrar movimientos (entrada/salida/ajuste)</td>
+                      <td>Si</td>
+                      <td>Si</td>
+                      <td>Si</td>
+                      <td className="pe-4">No</td>
+                    </tr>
+                    <tr>
+                      <td className="ps-4">Reservar / liberar / despachar stock</td>
+                      <td>Si</td>
+                      <td>Si</td>
+                      <td>Si</td>
+                      <td className="pe-4">No</td>
+                    </tr>
+                    <tr>
+                      <td className="ps-4">Crear/editar productos, categorías y almacenes</td>
+                      <td>Si</td>
+                      <td>Si</td>
+                      <td>No</td>
+                      <td className="pe-4">No</td>
+                    </tr>
+                    <tr>
+                      <td className="ps-4">Crear usuarios (operator/viewer)</td>
+                      <td>Si</td>
+                      <td>Si</td>
+                      <td>No</td>
+                      <td className="pe-4">No</td>
+                    </tr>
+                    <tr>
+                      <td className="ps-4">Crear otro owner</td>
+                      <td>Si</td>
+                      <td>No</td>
+                      <td>No</td>
+                      <td className="pe-4">No</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
