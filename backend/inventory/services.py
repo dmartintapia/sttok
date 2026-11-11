@@ -52,9 +52,7 @@ def calculate_available_stock(product):
 def register_movement(user, data):
     # Serializa movimientos del mismo producto para evitar ventas concurrentes
     # que validen ambas contra el mismo saldo disponible.
-    product = Product.objects.select_for_update().select_related("company").get(
-        pk=data["product"].pk
-    )
+    product = Product.objects.select_for_update().get(pk=data["product"].pk)
     deposit = data["deposit"]
     company = data.get("company") or getattr(product, "company", None)
     movement_type = data["movement_type"]
