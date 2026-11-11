@@ -94,9 +94,15 @@ class ProductSerializer(serializers.ModelSerializer):
         return attrs
 
     def get_current_stock(self, obj):
+        annotated_stock = getattr(obj, "annotated_current_stock", None)
+        if annotated_stock is not None:
+            return annotated_stock
         return calculate_stock(obj)
 
     def get_available_stock(self, obj):
+        annotated_stock = getattr(obj, "annotated_current_stock", None)
+        if annotated_stock is not None:
+            return annotated_stock - (obj.reserved_stock or Decimal("0"))
         return calculate_available_stock(obj)
 
     @transaction.atomic
