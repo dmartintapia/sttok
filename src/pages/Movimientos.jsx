@@ -11,7 +11,6 @@ import {
   Calendar,
   Package,
   ClipboardList,
-  TrendingUp,
   Activity,
   FileText,
   MapPin
@@ -39,6 +38,90 @@ const MOTIVOS_POR_TIPO = {
   salida: ['Venta entregada', 'Consumo interno', 'Ajuste por rotura'],
 }
 
+const PERIODS = {
+  today: { label: 'Hoy', comparisonLabel: 'ayer' },
+  yesterday: { label: 'Ayer', comparisonLabel: 'el día anterior' },
+  last7days: { label: 'Últimos 7 días', comparisonLabel: 'los 7 días previos' },
+}
+
+function shiftLocalDate(date, days) {
+  return getLocalDateOnly(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days))
+}
+
+function getPeriodRange(period, today) {
+  if (period === 'yesterday') {
+    const end = shiftLocalDate(today, -1)
+    return { start: end, end, previousStart: shiftLocalDate(today, -2), previousEnd: shiftLocalDate(today, -2) }
+  }
+
+  if (period === 'last7days') {
+    return {
+      start: shiftLocalDate(today, -6),
+      end: getLocalDateOnly(today),
+      previousStart: shiftLocalDate(today, -13),
+      previousEnd: shiftLocalDate(today, -7),
+    }
+  }
+
+  return {
+    start: getLocalDateOnly(today),
+    end: getLocalDateOnly(today),
+    previousStart: shiftLocalDate(today, -1),
+    previousEnd: shiftLocalDate(today, -1),
+  }
+}
+
+function summarizeMovements(movements, start, end) {
+  return movements.reduce((summary, movement) => {
+    if (movement.fecha < start || movement.fecha > end) return summary
+
+    const quantity = Number(movement.cantidad) || 0
+    if (movement.tipo === 'entrada') {
+      summary.entradas.operaciones += 1
+      summary.entradas.unidades += quantity
+    } else if (movement.tipo === 'salida') {
+      summary.salidas.operaciones += 1
+      summary.salidas.unidades += quantity
+    }
+    summary.unidadesMovidas += quantity
+    return summary
+  }, {
+    entradas: { operaciones: 0, unidades: 0 },
+    salidas: { operaciones: 0, unidades: 0 },
+    unidadesMovidas: 0,
+  })
+}
+
+function formatQuantity(quantity) {
+  return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(quantity)
+}
+
+function getComparison(current, previous, label) {
+  if (previous === 0) {
+    return current === 0
+      ? { text: 'Sin movimientos en ambos períodos', direction: 'neutral' }
+      : { text: `Nuevo vs ${label}`, direction: 'up' }
+  }
+
+  const change = ((current - previous) / previous) * 100
+  const formattedChange = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(Math.abs(change))
+  const sign = change > 0 ? '+' : change < 0 ? '−' : ''
+  return {
+    text: `${sign}${formattedChange}% vs ${label}`,
+    direction: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral',
+  }
+}
+
+function ComparisonText({ comparison }) {
+  const colorClass = comparison.direction === 'up'
+    ? 'text-success'
+    : comparison.direction === 'down'
+      ? 'text-danger'
+      : 'text-secondary'
+
+  return <div className={`mt-2 small ${colorClass}`}>{comparison.text}</div>
+}
+
 function Movimientos() {
   const [searchParams] = useSearchParams()
   const productoIdFromUrl = searchParams.get('productoId')
@@ -54,6 +137,7 @@ function Movimientos() {
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [period, setPeriod] = useState('today')
 
   useEffect(() => {
     Promise.all([getMovimientos(), getAlmacenes(), getReservasActivas()]).then(([movimientosData, almacenesData, reservasData]) => {
@@ -158,13 +242,22 @@ function Movimientos() {
     }
   }
 
-  // Métricas del día
-  const today = getLocalDateOnly()
-  const entradasHoy = movimientos.filter(m => m.tipo === 'entrada' && m.fecha === today).length
-  const salidasHoy = movimientos.filter(m => m.tipo === 'salida' && m.fecha === today).length
-  const totalItemsHoy = movimientos
-    .filter(m => m.fecha === today)
-    .reduce((acc, curr) => acc + Number(curr.cantidad), 0)
+  const today = new Date()
+  const periodRange = getPeriodRange(period, today)
+  const currentMetrics = summarizeMovements(movimientos, periodRange.start, periodRange.end)
+  const previousMetrics = summarizeMovements(movimientos, periodRange.previousStart, periodRange.previousEnd)
+  const comparisonLabel = PERIODS[period].comparisonLabel
+  const entriesComparison = getComparison(
+    currentMetrics.entradas.operaciones,
+    previousMetrics.entradas.operaciones,
+    comparisonLabel,
+  )
+  const exitsComparison = getComparison(
+    currentMetrics.salidas.operaciones,
+    previousMetrics.salidas.operaciones,
+    comparisonLabel,
+  )
+  const unitsComparison = getComparison(currentMetrics.unidadesMovidas, previousMetrics.unidadesMovidas, comparisonLabel)
 
   const filteredMovimientos = movimientos.filter(m =>
     String(m.producto || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -184,9 +277,20 @@ function Movimientos() {
           <p className="text-secondary">Gestión integral de entradas, salidas y trazabilidad de almacén</p>
         </div>
         <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2">
-            <Calendar size={14} /> Hoy
-          </button>
+          <label className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 mb-0">
+            <Calendar size={14} />
+            <span className="visually-hidden">Período de movimientos</span>
+            <select
+              className="form-select form-select-sm border-0 bg-transparent p-0 pe-4"
+              aria-label="Período de movimientos"
+              value={period}
+              onChange={(event) => setPeriod(event.target.value)}
+            >
+              {Object.entries(PERIODS).map(([value, option]) => (
+                <option key={value} value={value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
           <button className="btn btn-primary btn-sm d-flex align-items-center gap-2">
             <ClipboardList size={14} /> Reporte Kardex
           </button>
@@ -199,48 +303,45 @@ function Movimientos() {
           <div className="ent-card border-start border-4 border-success p-3">
             <div className="d-flex justify-content-between">
               <div>
-                <div className="text-muted small fw-bold">ENTRADAS (HOY)</div>
-                <div className="h4 fw-bold mb-0">{entradasHoy} ops.</div>
+                <div className="text-muted small fw-bold">ENTRADAS ({PERIODS[period].label.toUpperCase()})</div>
+                <div className="h4 fw-bold mb-0">{loading ? '—' : `${currentMetrics.entradas.operaciones} ops.`}</div>
+                <div className="small text-secondary">{loading ? 'Cargando movimientos...' : `${formatQuantity(currentMetrics.entradas.unidades)} unidades`}</div>
               </div>
               <div className="bg-success bg-opacity-10 p-2 rounded">
                 <ArrowUpCircle className="text-success" size={24} />
               </div>
             </div>
-            <div className="mt-2 small text-success">
-              <TrendingUp size={12} /> +12% vs ayer
-            </div>
+            {!loading && <ComparisonText comparison={entriesComparison} />}
           </div>
         </div>
         <div className="col-md-4">
           <div className="ent-card border-start border-4 border-danger p-3">
             <div className="d-flex justify-content-between">
               <div>
-                <div className="text-muted small fw-bold">SALIDAS (HOY)</div>
-                <div className="h4 fw-bold mb-0">{salidasHoy} ops.</div>
+                <div className="text-muted small fw-bold">SALIDAS ({PERIODS[period].label.toUpperCase()})</div>
+                <div className="h4 fw-bold mb-0">{loading ? '—' : `${currentMetrics.salidas.operaciones} ops.`}</div>
+                <div className="small text-secondary">{loading ? 'Cargando movimientos...' : `${formatQuantity(currentMetrics.salidas.unidades)} unidades`}</div>
               </div>
               <div className="bg-danger bg-opacity-10 p-2 rounded">
                 <ArrowDownCircle className="text-danger" size={24} />
               </div>
             </div>
-            <div className="mt-2 small text-danger">
-              <TrendingUp size={12} /> +5% vs ayer
-            </div>
+            {!loading && <ComparisonText comparison={exitsComparison} />}
           </div>
         </div>
         <div className="col-md-4">
           <div className="ent-card border-start border-4 border-primary p-3">
             <div className="d-flex justify-content-between">
               <div>
-                <div className="text-muted small fw-bold">ITEMS MOVILIZADOS</div>
-                <div className="h4 fw-bold mb-0">{totalItemsHoy} un.</div>
+                <div className="text-muted small fw-bold">UNIDADES MOVIDAS</div>
+                <div className="h4 fw-bold mb-0">{loading ? '—' : `${formatQuantity(currentMetrics.unidadesMovidas)} un.`}</div>
+                <div className="small text-secondary">Suma de movimientos</div>
               </div>
               <div className="bg-primary bg-opacity-10 p-2 rounded">
                 <Activity className="text-primary" size={24} />
               </div>
             </div>
-            <div className="mt-2 small text-primary text-opacity-75">
-              Flujo operativo activo
-            </div>
+            {!loading && <ComparisonText comparison={unitsComparison} />}
           </div>
         </div>
       </div>
