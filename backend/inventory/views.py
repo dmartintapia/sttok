@@ -225,7 +225,7 @@ class ProductViewSet(CompanyScopedModelViewSet):
         limit = max(1, min(limit, 100))
 
         queryset = (
-            Product.objects.filter(company=company).filter(
+            self.get_queryset().filter(
                 Q(sku__icontains=query) | Q(name__icontains=query)
             )
             .order_by("sku")[:limit]
@@ -292,6 +292,23 @@ class ProductViewSet(CompanyScopedModelViewSet):
             )
 
         with transaction.atomic():
+            product = Product.objects.select_for_update().get(pk=product.pk, company=company)
+            stock_in_deposit = (
+                Movement.objects.filter(company=company, product=product, deposit=deposit)
+                .aggregate(current_stock=Sum(signed_quantity))
+                .get("current_stock")
+                or Decimal("0")
+            )
+            if quantity > stock_in_deposit:
+                return Response(
+                    {"detail": f"No hay stock suficiente en {deposit.name} para reservar esa cantidad."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if quantity > calculate_available_stock(product):
+                return Response(
+                    {"detail": "No hay stock disponible suficiente para reservar."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             product.reserved_stock = (product.reserved_stock or Decimal("0")) + quantity
             product.save(update_fields=["reserved_stock"])
             AuditLog.objects.create(
@@ -348,6 +365,13 @@ class ProductViewSet(CompanyScopedModelViewSet):
             )
 
         with transaction.atomic():
+            product = Product.objects.select_for_update().get(pk=product.pk, company=company)
+            reserved = product.reserved_stock or Decimal("0")
+            if quantity > reserved:
+                return Response(
+                    {"detail": "No hay stock reservado suficiente para liberar."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             product.reserved_stock = reserved - quantity
             product.save(update_fields=["reserved_stock"])
             AuditLog.objects.create(
@@ -402,6 +426,13 @@ class ProductViewSet(CompanyScopedModelViewSet):
 
         try:
             with transaction.atomic():
+                product = Product.objects.select_for_update().get(pk=product.pk, company=company)
+                reserved = product.reserved_stock or Decimal("0")
+                if quantity > reserved:
+                    return Response(
+                        {"detail": "No hay stock reservado suficiente para despachar."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 register_movement(
                     request.user,
                     {
