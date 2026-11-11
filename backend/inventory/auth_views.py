@@ -11,6 +11,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import Company, UserCompany
 from .tenancy import get_user_company_link, has_any_role
@@ -85,6 +86,12 @@ def _client_ip(request):
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR", "")
+
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """Aplica los mismos límites al endpoint JWT estándar."""
+
+    throttle_classes = [LoginIpRateThrottle, LoginEmailRateThrottle]
 
 
 class LoginView(APIView):
