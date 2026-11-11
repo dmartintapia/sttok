@@ -3,6 +3,7 @@ import os
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
 from django.db.models import F, Case, When, Value, DecimalField, Sum, ExpressionWrapper, Q, Max
+from django.db.models.functions import Coalesce
 from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
@@ -138,6 +139,28 @@ class DepositViewSet(CompanyScopedModelViewSet):
 class ProductViewSet(CompanyScopedModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        signed_quantity = Case(
+            When(movement__movement_type__in=POSITIVE_TYPES, then=F("movement__quantity")),
+            When(
+                movement__movement_type__in=NEGATIVE_TYPES,
+                then=ExpressionWrapper(
+                    -1 * F("movement__quantity"),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                ),
+            ),
+            default=Value(Decimal("0")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+        return queryset.annotate(
+            annotated_current_stock=Coalesce(
+                Sum(signed_quantity),
+                Value(Decimal("0")),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
     filter_backends = [SearchFilter]
     search_fields = ["sku", "name"]
     required_roles_by_action = {
@@ -169,8 +192,8 @@ class ProductViewSet(CompanyScopedModelViewSet):
     def catalog(self, request):
         company = self.get_company()
         queryset = (
-            Product.objects.select_related("category")
-            .filter(company=company)
+            self.get_queryset()
+            .select_related("category")
             .annotate(last_movement_at=Max("movement__created_at"))
             .order_by("sku")
         )
