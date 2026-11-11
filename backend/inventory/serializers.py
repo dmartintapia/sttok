@@ -81,6 +81,18 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["company"]
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        company = require_company(getattr(request, "user", None))
+
+        for field in ("category", "unit"):
+            related = attrs.get(field) or getattr(self.instance, field, None)
+            if related and related.company_id not in (None, company.id):
+                raise serializers.ValidationError(
+                    {field: "El recurso pertenece a otra empresa."}
+                )
+        return attrs
+
     def get_current_stock(self, obj):
         return calculate_stock(obj)
 
