@@ -18,13 +18,20 @@ import {
 } from 'lucide-react'
 
 const initialForm = {
-  fecha: new Date().toISOString().slice(0, 10),
+  fecha: getLocalDateOnly(),
   productoId: '',
   tipo: 'entrada',
   almacen: 'WH-A',
   cantidad: 1,
   motivo: 'Reposición proveedor',
   referencia: '',
+}
+
+function getLocalDateOnly(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 const MOTIVOS_POR_TIPO = {
@@ -152,10 +159,11 @@ function Movimientos() {
   }
 
   // Métricas del día
-  const entradasHoy = movimientos.filter(m => m.tipo === 'entrada' && m.fecha === initialForm.fecha).length
-  const salidasHoy = movimientos.filter(m => m.tipo === 'salida' && m.fecha === initialForm.fecha).length
+  const today = getLocalDateOnly()
+  const entradasHoy = movimientos.filter(m => m.tipo === 'entrada' && m.fecha === today).length
+  const salidasHoy = movimientos.filter(m => m.tipo === 'salida' && m.fecha === today).length
   const totalItemsHoy = movimientos
-    .filter(m => m.fecha === initialForm.fecha)
+    .filter(m => m.fecha === today)
     .reduce((acc, curr) => acc + Number(curr.cantidad), 0)
 
   const filteredMovimientos = movimientos.filter(m =>
@@ -462,3 +470,4 @@ function Movimientos() {
 }
 
 export default Movimientos
+
