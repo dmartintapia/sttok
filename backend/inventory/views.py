@@ -3,6 +3,7 @@ import os
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
 from django.db.models import F, Case, When, Value, DecimalField, Sum, ExpressionWrapper, Q, Max
+from django.db.models.functions import Coalesce
 from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
@@ -138,6 +139,31 @@ class DepositViewSet(CompanyScopedModelViewSet):
 class ProductViewSet(CompanyScopedModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        signed_quantity = Case(
+            When(
+                movement__movement_type__in=POSITIVE_TYPES,
+                then=F("movement__quantity"),
+            ),
+            When(
+                movement__movement_type__in=NEGATIVE_TYPES,
+                then=ExpressionWrapper(
+                    -1 * F("movement__quantity"),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                ),
+            ),
+            default=Value(Decimal("0")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+        return queryset.annotate(
+            annotated_current_stock=Coalesce(
+                Sum(signed_quantity),
+                Value(Decimal("0")),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
     filter_backends = [SearchFilter]
     search_fields = ["sku", "name"]
     required_roles_by_action = {
@@ -169,8 +195,8 @@ class ProductViewSet(CompanyScopedModelViewSet):
     def catalog(self, request):
         company = self.get_company()
         queryset = (
-            Product.objects.select_related("category")
-            .filter(company=company)
+            self.get_queryset()
+            .select_related("category")
             .annotate(last_movement_at=Max("movement__created_at"))
             .order_by("sku")
         )
@@ -190,7 +216,6 @@ class ProductViewSet(CompanyScopedModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="quick-search")
     def quick_search(self, request):
-        company = self.get_company()
         query = str(request.query_params.get("q", "")).strip()
         if len(query) < 2:
             return Response([], status=status.HTTP_200_OK)
@@ -202,7 +227,7 @@ class ProductViewSet(CompanyScopedModelViewSet):
         limit = max(1, min(limit, 100))
 
         queryset = (
-            Product.objects.filter(company=company).filter(
+            self.get_queryset().filter(
                 Q(sku__icontains=query) | Q(name__icontains=query)
             )
             .order_by("sku")[:limit]
@@ -269,6 +294,31 @@ class ProductViewSet(CompanyScopedModelViewSet):
             )
 
         with transaction.atomic():
+            product = Product.objects.select_for_update().get(
+                pk=product.pk,
+                company=company,
+            )
+            stock_in_deposit = (
+                Movement.objects.filter(company=company, product=product, deposit=deposit)
+                .aggregate(current_stock=Sum(signed_quantity))
+                .get("current_stock")
+                or Decimal("0")
+            )
+            if quantity > stock_in_deposit:
+                return Response(
+                    {
+                        "detail": (
+                            f"No hay stock suficiente en {deposit.name} "
+                            "para reservar esa cantidad."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if quantity > calculate_available_stock(product):
+                return Response(
+                    {"detail": "No hay stock disponible suficiente para reservar."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             product.reserved_stock = (product.reserved_stock or Decimal("0")) + quantity
             product.save(update_fields=["reserved_stock"])
             AuditLog.objects.create(
@@ -325,6 +375,13 @@ class ProductViewSet(CompanyScopedModelViewSet):
             )
 
         with transaction.atomic():
+            product = Product.objects.select_for_update().get(pk=product.pk, company=company)
+            reserved = product.reserved_stock or Decimal("0")
+            if quantity > reserved:
+                return Response(
+                    {"detail": "No hay stock reservado suficiente para liberar."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             product.reserved_stock = reserved - quantity
             product.save(update_fields=["reserved_stock"])
             AuditLog.objects.create(
@@ -379,6 +436,16 @@ class ProductViewSet(CompanyScopedModelViewSet):
 
         try:
             with transaction.atomic():
+                product = Product.objects.select_for_update().get(
+                    pk=product.pk,
+                    company=company,
+                )
+                reserved = product.reserved_stock or Decimal("0")
+                if quantity > reserved:
+                    return Response(
+                        {"detail": "No hay stock reservado suficiente para despachar."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 register_movement(
                     request.user,
                     {

@@ -5,7 +5,7 @@ from django.db.models import Sum, Case, When, Value, DecimalField, F, Expression
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Movement, AuditLog
+from .models import Movement, AuditLog, Product
 
 logger = logging.getLogger("inventory")
 
@@ -50,7 +50,9 @@ def calculate_available_stock(product):
 
 @transaction.atomic
 def register_movement(user, data):
-    product = data["product"]
+    # Serializa movimientos del mismo producto para evitar ventas concurrentes
+    # que validen ambas contra el mismo saldo disponible.
+    product = Product.objects.select_for_update().get(pk=data["product"].pk)
     deposit = data["deposit"]
     company = data.get("company") or getattr(product, "company", None)
     movement_type = data["movement_type"]

@@ -12,9 +12,23 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+const formatLocalDate = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const toDateOnly = (value) => {
-  if (!value) return new Date().toISOString().slice(0, 10)
-  return String(value).slice(0, 10)
+  if (!value) return formatLocalDate(new Date())
+
+  const rawValue = String(value)
+  if (rawValue.length <= 10) return rawValue.slice(0, 10)
+
+  // API timestamps are UTC; format them in the user's local timezone so
+  // daily summaries and dates shown in the UI use the same calendar day.
+  const date = new Date(rawValue)
+  return Number.isNaN(date.getTime()) ? rawValue.slice(0, 10) : formatLocalDate(date)
 }
 
 const extractApiErrorMessage = (data) => {
@@ -844,3 +858,4 @@ export async function getKardexPage({ page = 1, pageSize = 100, productoId = '',
     hasPrevious: Boolean(data?.previous),
   }
 }
+

@@ -1,7 +1,13 @@
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from inventory.auth_views import LoginView, MeView, CompanyUsersView, PublicSignupView
+from rest_framework_simplejwt.views import TokenRefreshView
+from inventory.auth_views import (
+    LoginView,
+    MeView,
+    CompanyUsersView,
+    PublicSignupView,
+    ThrottledTokenObtainPairView,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -9,7 +15,11 @@ urlpatterns = [
     path("api/auth/signup/", PublicSignupView.as_view(), name="auth_signup"),
     path("api/auth/me/", MeView.as_view(), name="auth_me"),
     path("api/auth/users/", CompanyUsersView.as_view(), name="auth_users"),
-    path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path(
+        "api/auth/token/",
+        ThrottledTokenObtainPairView.as_view(),
+        name="token_obtain_pair",
+    ),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/", include("inventory.urls")),
 ]
