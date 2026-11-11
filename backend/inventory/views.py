@@ -143,7 +143,10 @@ class ProductViewSet(CompanyScopedModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         signed_quantity = Case(
-            When(movement__movement_type__in=POSITIVE_TYPES, then=F("movement__quantity")),
+            When(
+                movement__movement_type__in=POSITIVE_TYPES,
+                then=F("movement__quantity"),
+            ),
             When(
                 movement__movement_type__in=NEGATIVE_TYPES,
                 then=ExpressionWrapper(
@@ -213,7 +216,6 @@ class ProductViewSet(CompanyScopedModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="quick-search")
     def quick_search(self, request):
-        company = self.get_company()
         query = str(request.query_params.get("q", "")).strip()
         if len(query) < 2:
             return Response([], status=status.HTTP_200_OK)
@@ -292,7 +294,10 @@ class ProductViewSet(CompanyScopedModelViewSet):
             )
 
         with transaction.atomic():
-            product = Product.objects.select_for_update().get(pk=product.pk, company=company)
+            product = Product.objects.select_for_update().get(
+                pk=product.pk,
+                company=company,
+            )
             stock_in_deposit = (
                 Movement.objects.filter(company=company, product=product, deposit=deposit)
                 .aggregate(current_stock=Sum(signed_quantity))
@@ -301,7 +306,12 @@ class ProductViewSet(CompanyScopedModelViewSet):
             )
             if quantity > stock_in_deposit:
                 return Response(
-                    {"detail": f"No hay stock suficiente en {deposit.name} para reservar esa cantidad."},
+                    {
+                        "detail": (
+                            f"No hay stock suficiente en {deposit.name} "
+                            "para reservar esa cantidad."
+                        )
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             if quantity > calculate_available_stock(product):
@@ -426,7 +436,10 @@ class ProductViewSet(CompanyScopedModelViewSet):
 
         try:
             with transaction.atomic():
-                product = Product.objects.select_for_update().get(pk=product.pk, company=company)
+                product = Product.objects.select_for_update().get(
+                    pk=product.pk,
+                    company=company,
+                )
                 reserved = product.reserved_stock or Decimal("0")
                 if quantity > reserved:
                     return Response(
